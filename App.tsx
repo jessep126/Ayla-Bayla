@@ -116,7 +116,7 @@ const ShareIcon = () => (
 );
 
 const App: React.FC = () => {
-  const [step, setStep] = useState<'intro' | 'form' | 'loading' | 'results'>('intro');
+  const [step, setStep] = useState<'intro' | 'form' | 'loading' | 'results' | 'error'>('intro');
   const [userData, setUserData] = useState<UserData>({
     name: '',
     age: '',
@@ -131,6 +131,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'poem' | 'wordsearch' | 'coloring' | 'game'>('poem');
   const [isMusicOn, setIsMusicOn] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
     if (step === 'results') {
@@ -148,6 +149,12 @@ const App: React.FC = () => {
   }, [isMusicOn]);
 
   const startMagic = async () => {
+    if (!process.env.API_KEY || process.env.API_KEY === "") {
+      setErrorMessage("The Magic Wand is missing its power! (Missing API Key). Please add it to your environment variables.");
+      setStep('error');
+      return;
+    }
+
     playChime();
     setStep('loading');
     try {
@@ -162,10 +169,10 @@ const App: React.FC = () => {
       setColoringUrl(imageUrl);
       setWordSearchData(wsData);
       setStep('results');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Magic failure", error);
-      alert("Oops! The magic wand slipped. Let's try again!");
-      setStep('form');
+      setErrorMessage(error.message || "Something went wrong while brewing the magic!");
+      setStep('error');
     }
   };
 
@@ -178,8 +185,9 @@ const App: React.FC = () => {
       if (magicContent) {
         setMagicContent({ ...magicContent, poem: newPoem });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert("Rhyme error: " + e.message);
     } finally {
       setIsRefreshing(false);
     }
@@ -193,8 +201,9 @@ const App: React.FC = () => {
       const newWords = await regenerateWordSearchWords(userData);
       const wsData = createWordSearch(newWords);
       setWordSearchData(wsData);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert("Puzzle error: " + e.message);
     } finally {
       setIsRefreshing(false);
     }
@@ -255,7 +264,7 @@ const App: React.FC = () => {
               </svg>
             )}
           </button>
-          {step === 'results' && (
+          {(step === 'results' || step === 'error') && (
             <button 
               onClick={() => { playChime(); setStep('intro'); }}
               className="text-sm sm:text-xl font-kids font-bold text-indigo-600 bg-indigo-50 px-5 py-3 sm:px-8 sm:py-4 rounded-[1.5rem] hover:bg-indigo-100 transition-all transform active:scale-95 shadow-sm"
@@ -363,6 +372,24 @@ const App: React.FC = () => {
               </h2>
               <p className="text-2xl sm:text-4xl text-slate-500 italic font-medium animate-bounce">Almost ready to show you the magic!</p>
             </div>
+          </div>
+        )}
+
+        {step === 'error' && (
+          <div className="text-center py-10 sm:py-24 space-y-10 sm:space-y-16 animate-scale-in">
+            <div className="text-8xl sm:text-[12rem] animate-bounce">🤕</div>
+            <h2 className="text-4xl sm:text-7xl font-kids font-bold text-rose-600">Oops! The magic wand slipped.</h2>
+            <div className="bg-rose-50 p-8 sm:p-14 rounded-[3rem] border-[6px] border-rose-100 max-w-4xl mx-auto">
+              <p className="text-xl sm:text-4xl text-rose-900 font-kids leading-relaxed">
+                {errorMessage}
+              </p>
+            </div>
+            <button
+              onClick={() => setStep('form')}
+              className="bg-indigo-600 text-white font-kids text-2xl sm:text-5xl px-12 sm:px-24 py-6 sm:py-12 rounded-full shadow-xl hover:bg-indigo-700 transition transform hover:scale-105"
+            >
+              Try Again 🪄
+            </button>
           </div>
         )}
 
