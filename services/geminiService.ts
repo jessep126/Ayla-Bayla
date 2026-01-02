@@ -2,6 +2,23 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserData, GeneratedContent } from "../types";
 
+const extractJSON = (text: string) => {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // If simple parse fails, try to find JSON block in the text
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (e2) {
+        throw new Error("The Magic Brain sent a jumbled message! Please try again.");
+      }
+    }
+    throw new Error("The Magic Brain forgot how to write in code! Please try again.");
+  }
+};
+
 export const generateKidMagic = async (userData: UserData): Promise<GeneratedContent> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
   
@@ -9,10 +26,16 @@ export const generateKidMagic = async (userData: UserData): Promise<GeneratedCon
     Create a personalized "Magic Kit" for a child named ${userData.name}.
     Info: Age ${userData.age}, Loves ${userData.favoriteAnimal}, Favorite color is ${userData.favoriteColor}, Loves eating ${userData.favoriteFood}, and enjoys ${userData.hobby}.
 
-    I need:
-    1. A short, fun, 8-line poem about ${userData.name} and their favorites. STICK TO A CLEAR RHYMING SCHEME (AABB or ABAB).
-    2. A list of 15-20 challenging words related to ${userData.name} and their interests for a wordsearch.
-    3. A detailed prompt for an image generator to create a "coloring book" style black and white line art image of ${userData.name} with a ${userData.favoriteAnimal} in a world made of ${userData.favoriteFood}.
+    I need exactly this JSON format:
+    {
+      "poem": "An 8-line rhyming poem",
+      "wordSearchWords": ["WORD1", "WORD2", ... 15-20 total],
+      "coloringPrompt": "A detailed description for a coloring page"
+    }
+
+    The poem must have a clear AABB or ABAB rhyme scheme.
+    The words must be related to ${userData.name}'s interests.
+    The coloringPrompt should describe ${userData.name} with a ${userData.favoriteAnimal} in a land of ${userData.favoriteFood}.
   `;
 
   try {
@@ -21,34 +44,22 @@ export const generateKidMagic = async (userData: UserData): Promise<GeneratedCon
       contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            poem: { type: Type.STRING, description: "A strictly rhyming poem for the child" },
-            wordSearchWords: { 
-              type: Type.ARRAY, 
-              items: { type: Type.STRING },
-              description: "15-20 challenging words related to the child"
-            },
-            coloringPrompt: { type: Type.STRING, description: "Prompt for coloring page image generation" }
-          },
-          required: ["poem", "wordSearchWords", "coloringPrompt"]
-        }
       }
     });
 
-    if (!response.text) {
+    const text = response.text;
+    if (!text) {
       throw new Error("The Magic Brain was too shy to speak! (Empty response).");
     }
 
-    const result = JSON.parse(response.text);
-    return result;
+    return extractJSON(text);
   } catch (error: any) {
+    console.error("Gemini Text Error:", error);
     if (error.message?.includes("API_KEY_INVALID") || error.message?.includes("401")) {
-      throw new Error("The Magic Wand is missing its battery! (Invalid API Key).");
+      throw new Error("The Magic Wand's battery is empty! (Check your API Key).");
     }
     if (error.message?.includes("safety") || error.message?.includes("blocked")) {
-      throw new Error("The Magic Wand got a bit scared! (Content Blocked). Try using different favorites.");
+      throw new Error("The Magic Wand got scared! (Safety Filter). Try different words!");
     }
     throw error;
   }
@@ -56,54 +67,43 @@ export const generateKidMagic = async (userData: UserData): Promise<GeneratedCon
 
 export const regeneratePoem = async (userData: UserData): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-  const prompt = `Create a NEW and DIFFERENT fun 8-line rhyming poem for ${userData.name}. 
-  Must rhyme perfectly (AABB or ABAB). 
-  Context: Likes ${userData.favoriteAnimal}, ${userData.favoriteColor}, ${userData.favoriteFood}, and ${userData.hobby}.`;
+  const prompt = `Create a NEW 8-line rhyming poem for ${userData.name}. 
+  Context: Loves ${userData.favoriteAnimal}, ${userData.favoriteColor}, ${userData.favoriteFood}, and ${userData.hobby}.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
     config: {
-      systemInstruction: "You are a master children's poet. Always use simple, delightful rhymes.",
+      systemInstruction: "You are a master children's poet. Use simple, delightful rhymes (AABB or ABAB).",
     }
   });
-  return response.text || "Oops, the rhyme got lost!";
+  return response.text || "Oops, the rhyme got lost in the clouds!";
 };
 
 export const regenerateWordSearchWords = async (userData: UserData): Promise<string[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-  const prompt = `Provide a NEW list of 15-20 challenging words for a wordsearch for ${userData.name}. 
-  Context: Likes ${userData.favoriteAnimal}, ${userData.favoriteColor}, ${userData.favoriteFood}, and ${userData.hobby}.
-  Mix simple words with longer, more complex ones related to these topics.`;
+  const prompt = `Return a JSON object with a "words" key containing 15-20 words for ${userData.name}. 
+  Context: ${userData.favoriteAnimal}, ${userData.favoriteColor}, ${userData.favoriteFood}, ${userData.hobby}.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
     config: {
       responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          words: { 
-            type: Type.ARRAY, 
-            items: { type: Type.STRING }
-          }
-        },
-        required: ["words"]
-      }
     }
   });
   
-  if (!response.text) return ["MAGIC", "FUN", "COOL"];
+  const text = response.text;
+  if (!text) return ["MAGIC", "AYLA", "BAYLA", "FUN"];
   
-  const result = JSON.parse(response.text);
-  return result.words;
+  const result = extractJSON(text);
+  return result.words || ["MAGIC", "AYLA", "BAYLA", "FUN"];
 };
 
 export const generateColoringImage = async (prompt: string): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
   
-  const fullPrompt = `Black and white line art coloring page for kids. High contrast, thick bold outlines, absolutely no shading, white background only. Theme: ${prompt}`;
+  const fullPrompt = `Pure black and white line art coloring page for kids. Bold outlines, white background, no shading. Scene: ${prompt}`;
   
   try {
     const response = await ai.models.generateContent({
@@ -118,13 +118,16 @@ export const generateColoringImage = async (prompt: string): Promise<string> => 
       }
     });
 
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
+    const candidates = response.candidates;
+    if (candidates && candidates.length > 0) {
+      for (const part of candidates[0].content.parts) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
       }
     }
   } catch (e) {
-    console.error("Image generation failed", e);
+    console.error("Gemini Image Error:", e);
   }
   
   throw new Error("The magic paintbrush ran out of ink! (Image generation failed).");
