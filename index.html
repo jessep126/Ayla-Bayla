@@ -3,16 +3,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Ayla Bayla</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --ios-safe-area-bottom: env(safe-area-inset-bottom);
+        }
         body {
             font-family: 'Nunito', sans-serif;
             background: #e0f2fe;
-            background-image: radial-gradient(#bae6fd 2px, transparent 2px);
-            background-size: 40px 40px;
+            background-image: radial-gradient(#bae6fd 2.5px, transparent 2.5px);
+            background-size: 50px 50px;
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .font-kids {
             font-family: 'Fredoka', cursive;
@@ -24,21 +29,25 @@
             .print-only {
                 display: block !important;
             }
-            .coloring-page {
-                page-break-after: always;
+            .page-break {
+                page-break-before: always;
             }
         }
         /* Custom bubbly scrollbar */
         ::-webkit-scrollbar {
-            width: 12px;
+            width: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #f1f5f9;
+            background: transparent;
         }
         ::-webkit-scrollbar-thumb {
             background: #818cf8;
-            border-radius: 10px;
-            border: 3px solid #f1f5f9;
+            border-radius: 20px;
+            border: 2px solid #e0f2fe;
+        }
+        /* Fix for iOS momentum scrolling */
+        .scroll-container {
+            -webkit-overflow-scrolling: touch;
         }
     </style>
 <script type="importmap">
