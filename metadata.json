@@ -1,0 +1,7 @@
+{
+  "name": "Ayla Bayla",
+  "description": "A personalized magic book creator for kids that generates custom poems, wordsearches, and coloring pages based on their favorite things.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

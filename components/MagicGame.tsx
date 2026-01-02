@@ -1,0 +1,160 @@
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { playPop, playSuccess, playSparkle } from '../utils/sounds';
+
+interface MagicGameProps {
+  name: string;
+  favoriteColor: string;
+}
+
+interface Sparkle {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  type: 'star' | 'bubble' | 'heart';
+  speed: number;
+  color: string;
+}
+
+const MagicGame: React.FC<MagicGameProps> = ({ name, favoriteColor }) => {
+  const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(parseInt(localStorage.getItem('ayla_bayla_highscore') || '0'));
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [sparkles, setSparkles] = useState<Sparkle[]>([]);
+  const gameRef = useRef<HTMLDivElement>(null);
+  const sparkleIdRef = useRef(0);
+
+  const startGame = () => {
+    setScore(0);
+    setTimeLeft(30);
+    setIsPlaying(true);
+    setSparkles([]);
+    playSparkle();
+  };
+
+  const spawnSparkle = useCallback(() => {
+    if (!gameRef.current) return;
+    const width = gameRef.current.clientWidth;
+    const types: ('star' | 'bubble' | 'heart')[] = ['star', 'bubble', 'heart'];
+    const colors = ['#FFD700', '#FF69B4', '#00BFFF', '#7CFC00', '#FF4500', favoriteColor];
+    
+    const newSparkle: Sparkle = {
+      id: sparkleIdRef.current++,
+      x: Math.random() * (width - 60),
+      y: -50,
+      size: 40 + Math.random() * 40,
+      type: types[Math.floor(Math.random() * types.length)],
+      speed: 2 + Math.random() * 4,
+      color: colors[Math.floor(Math.random() * colors.length)]
+    };
+    
+    setSparkles(prev => [...prev, newSparkle]);
+  }, [favoriteColor]);
+
+  useEffect(() => {
+    let spawnTimer: number;
+    let moveTimer: number;
+    let clockTimer: number;
+
+    if (isPlaying && timeLeft > 0) {
+      spawnTimer = window.setInterval(spawnSparkle, 800);
+      
+      moveTimer = window.setInterval(() => {
+        setSparkles(prev => prev.map(s => ({ ...s, y: s.y + s.speed })).filter(s => s.y < 800));
+      }, 16);
+
+      clockTimer = window.setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft <= 0 && isPlaying) {
+      setIsPlaying(false);
+      if (score > highScore) {
+        setHighScore(score);
+        localStorage.setItem('ayla_bayla_highscore', score.toString());
+        playSuccess();
+      }
+    }
+
+    return () => {
+      clearInterval(spawnTimer);
+      clearInterval(moveTimer);
+      clearInterval(clockTimer);
+    };
+  }, [isPlaying, timeLeft, spawnSparkle, score, highScore]);
+
+  const popSparkle = (id: number) => {
+    playPop();
+    setScore(prev => prev + 10);
+    setSparkles(prev => prev.filter(s => s.id !== id));
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-6 w-full max-w-2xl mx-auto font-kids">
+      <div className="flex justify-between w-full px-4 py-4 bg-white/80 backdrop-blur-sm rounded-3xl border-4 border-yellow-200 shadow-lg">
+        <div className="text-center">
+          <p className="text-xl text-slate-500 uppercase font-bold tracking-widest">Score</p>
+          <p className="text-4xl text-indigo-600 font-bold">{score}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xl text-slate-500 uppercase font-bold tracking-widest">Best</p>
+          <p className="text-4xl text-emerald-600 font-bold">{highScore}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-xl text-slate-500 uppercase font-bold tracking-widest">Time</p>
+          <p className={`text-4xl font-bold ${timeLeft < 10 ? 'text-red-500 animate-pulse' : 'text-slate-700'}`}>{timeLeft}s</p>
+        </div>
+      </div>
+
+      <div 
+        ref={gameRef}
+        className="relative w-full h-[500px] bg-gradient-to-b from-sky-100 to-indigo-100 rounded-[3rem] border-8 border-white shadow-inner overflow-hidden cursor-pointer touch-none"
+      >
+        {!isPlaying ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-md z-20 gap-8">
+            <h2 className="text-5xl sm:text-7xl font-bold text-slate-800 text-center px-6">
+              {timeLeft <= 0 ? "Magic Time Over!" : `Magic Pop for ${name}!`}
+            </h2>
+            {timeLeft <= 0 && (
+              <p className="text-3xl font-bold text-indigo-600">You scored {score} points! ✨</p>
+            )}
+            <button
+              onClick={startGame}
+              className="bg-yellow-400 hover:bg-yellow-500 text-amber-950 text-3xl sm:text-5xl px-16 py-8 rounded-full shadow-2xl transition transform hover:scale-110 active:scale-95 border-b-8 border-yellow-600"
+            >
+              {timeLeft <= 0 ? "Try Again! 🔄" : "Start Game! 🪄"}
+            </button>
+          </div>
+        ) : (
+          sparkles.map(s => (
+            <div
+              key={s.id}
+              onClick={() => popSparkle(s.id)}
+              onTouchStart={() => popSparkle(s.id)}
+              className="absolute select-none transition-transform hover:scale-110 active:scale-90"
+              style={{
+                left: s.x,
+                top: s.y,
+                width: s.size,
+                height: s.size,
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill={s.color} className="w-full h-full drop-shadow-md">
+                {s.type === 'star' && <path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z" />}
+                {s.type === 'bubble' && <circle cx="12" cy="12" r="10" opacity="0.8" />}
+                {s.type === 'heart' && <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />}
+              </svg>
+            </div>
+          ))
+        )}
+      </div>
+
+      <p className="text-slate-400 font-bold italic animate-pulse">
+        Pop the falling magic as fast as you can! 🚀
+      </p>
+    </div>
+  );
+};
+
+export default MagicGame;
